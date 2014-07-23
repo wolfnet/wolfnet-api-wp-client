@@ -207,12 +207,15 @@ class Wolfnet_Api_Wp_Client
     private function isValidResource($resource)
     {
         // TODO: Add more validation criteria.
-
+        // 
+        if ($this->debug === true) {
+            echo "Valid resource? $resource<br>";
+        }
         // If the resource does not start with a leading slash it is not valid.
-        if (substr($resource, 0, 1 !== "/")) {
-            return true;
-        } else {
+        if (substr($resource, 0, 1) !== "/") {
             return new WP_Error('badResource', __("The Resource does not start with a leading slash."));
+        } else {
+            return true;
         }
 
     }

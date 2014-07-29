@@ -11,7 +11,14 @@ class Wolfnet_Api_Wp_Client
      * if set to true print extended information about the request and the response as well as the data
      * @var boolean
      */
-    public $debug = false;
+    private $debug = false;
+
+    /**
+     * Defins how long, in seconds, we should cache api responses before we query the server again
+     * @var int
+     */
+    // private $requestTtl = (30 * 60); // 30 min
+    private $requestTtl = 1800; // 30 min
 
     /**
      * The hostname for the API server.
@@ -37,7 +44,7 @@ class Wolfnet_Api_Wp_Client
      * must be less than 12 characters 
      * @var string
      */
-    public $transientIndexKey = 'wnt_trans';
+    public $transientIndexKey = 'wnt_tran_';
 
 
     /**
@@ -106,7 +113,7 @@ class Wolfnet_Api_Wp_Client
         if (is_wp_error($err))  return $err;
 
         // Retrieve a fully qualified URL for the request based on the requested resource.
-        $fullUrl = $this->buildFullUrl($resource);
+        $full_url = $this->buildFullUrl($resource);
 
         // Unless told otherwise, attempt to retrieve an API token.
         if (!$skipAuth) {
@@ -125,7 +132,7 @@ class Wolfnet_Api_Wp_Client
         //set up headers, body, and url data as needed
         switch ($method) {
             case 'GET':
-                $fullUrl = add_query_arg($data, $fullUrl);
+                $full_url = add_query_arg($data, $full_url);
                 break;
             case 'POST':
 
@@ -137,51 +144,37 @@ class Wolfnet_Api_Wp_Client
                 break;
         }
 
-        if ($this->debug === true) {
-            echo "<br>================================<br>The rawRequest() method says:<br>";
-            echo "URL being requested is $fullUrl";
-            echo "<pre>the args sent with the request are: \n";
-            print_r($args);
-            echo "</pre>";
-        }
-        
+        // check to see if we have this cached:
+        $transient_key = $this->transientIndexKey . md5($full_url . json_encode($args));
 
-        $api_response = wp_remote_request($fullUrl, $args);
+        // set response to the value of the transient if it is valid
+        if ( ($response = get_transient($transient_key)) === false ) {
 
-        if (is_wp_error($api_response)) {
-            return $api_response;
-        }
+            $api_response = wp_remote_request($full_url, $args);
+    
+            if (is_wp_error($api_response)) {
+                return $api_response;
+            }
 
-        if ($this->debug === true) {
-            echo "<br><br>The raw responce from the API server is:<br>";
-            echo "<pre>";
-            print_r($api_response);
-            echo "</pre>";
-            echo "<br>================================<br>";
-        }
+    
+            // build an array with useful representation of the response 
+            $response = array(
+                'requestUrl' => $full_url,
+                'requestMethod' => $method,
+                'requestData' => $data,
+                'responseStatusCode' => $api_response['response']['code'],
+                'responseData' => $api_response['body'],
+                'timestamp' => time(),
+                );
+    
+            // If the response type is JSON convert it to an array.
+            // ie if the response content type contains the string 'application/json'
+            if ( strpos($api_response['headers']['content-type'], 'application/json') == "application/json") {
+                $response['responseData'] = json_decode( $response['responseData'], true ); 
+            }
 
-        // build an array with useful representation of the response 
-        $response = array(
-            'requestUrl' => $fullUrl,
-            'requestMethod' => $method,
-            'requestData' => $data,
-            'responseStatusCode' => $api_response['response']['code'],
-            'responseData' => $api_response['body'],
-            'timestamp' => time(),
-            );
+            set_transient($transient_key, $response, $this->requestTtl);
 
-        // If the response type is JSON convert it to an array.
-        // if the response content type contains the string 'application/json'
-        if ( strpos($api_response['headers']['content-type'], 'application/json') == "application/json") {
-            $response['responseData'] = json_decode( $response['responseData'], true ); 
-        }
-
-        if ($this->debug === true) {
-            echo "rawRequest() is returning:<br>";
-            echo "<pre>\n";
-            print_r($response);
-            echo "</pre>";
-            echo "end rawRequest()<br>================================<br>";
         }
 
         return $response;
@@ -207,10 +200,7 @@ class Wolfnet_Api_Wp_Client
     private function isValidResource($resource)
     {
         // TODO: Add more validation criteria.
-        // 
-        if ($this->debug === true) {
-            echo "Valid resource? $resource<br>";
-        }
+
         // If the resource does not start with a leading slash it is not valid.
         if (substr($resource, 0, 1) !== "/") {
             return new WP_Error('badResource', __("The Resource does not start with a leading slash."));
@@ -269,13 +259,7 @@ class Wolfnet_Api_Wp_Client
         $token = get_transient( $transient_key );
         //$token = $force ? "" : $this->retrieveApiTokenDataFromCache($key);
 
-        if ($this->debug === true) {
-            echo "<br>================================<br>getApiToken()<br>the key is: $key<br>";
-            echo "Token retrieved from transient is: |$token|<br>";
-        }
-
-
-        
+         
         // If a token was not retrieved from the cache perform an API request to retrieve a new one.
         if ($token == "") {
             $data = array(
@@ -298,10 +282,6 @@ class Wolfnet_Api_Wp_Client
             // TODO: Validate that the response includes the data we need.
             $token = $auth_response['responseData']['data']['api_token'];
 
-            if ($this->debug === true) {
-                echo "Token retrieved from Api authentication is: |$token|<br>";
-            }
-
             // time to live. when should this transient expire?
             // expiration time - time created - 5
             $ttl = ( strtotime($auth_response['responseData']['data']['expiration']) - strtotime($auth_response['responseData']['data']['date_created']) - 5 );
@@ -311,15 +291,11 @@ class Wolfnet_Api_Wp_Client
                 $ttl = 60*60; // if we cant calculate then default to an hour 
 
             $transient_key = $this->transientIndexKey . $key;
-            if ($this->debug === true) {
-                echo "Setting Transient transient_key: |$transient_key|, token: |$token|, time until expire: |$ttl| seconds<br>";
-            }
+
             set_transient( $transient_key, $token, $ttl );
 
         }
-        if ($this->debug === true) {
-            echo"end getApiToken()<br>================================<br>";
-        }
+
         return $token;
 
     }

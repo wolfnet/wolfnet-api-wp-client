@@ -4,6 +4,7 @@
  */
 
 
+
 class Wolfnet_Api_Wp_Client
 {
         
@@ -65,7 +66,6 @@ class Wolfnet_Api_Wp_Client
     )
     {
         return $this->rawRequest($key, $resource, $method, $data, $headers);
-
     }
 
     
@@ -151,11 +151,73 @@ class Wolfnet_Api_Wp_Client
         if ( ($response = get_transient($transient_key)) === false ) {
 
             $api_response = wp_remote_request($full_url, $args);
+
+            echo "<pre>api_response: \n";
+            print_r($api_response);
+            echo "</pre>";
     
             if (is_wp_error($api_response)) {
                 return $api_response;
             }
 
+// COLD FUSION CODE
+//             // The API returned a 401 Unauthorized so throw an exception.
+// if (apiResponse.responseStatusCode == 401) {
+//     throw(type="wolfnet.api.client.Unauthorized",
+//         message=httpPrefix.status_text,
+//         extendedInfo=serializeJSON(apiResponse));
+            
+            // The API returned a 401 Unauthorized
+            if ($api_response['response']['code'] == 401)
+                return new WP_Error( '401', __( "401 Unauthorized" ), $api_response );
+            
+            // The API returned a 503 Forbidden
+            if ($api_response['response']['code'] == 503)
+                return new WP_Error( '503', __( "503 Service Unavailable" ), $api_response );
+
+            // The API returned a 403 Forbidden 
+            if ($api_response['response']['code'] == 403)
+                return new WP_Error( '403', __( "403 Forbidden" ), $api_response );
+
+            // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
+            // if ($api_response['response']['code'] == 400)
+//                && ( 
+//                    (structKeyExists(apiResponse.responseData.metadata.status, "errorCode") && apiResponse.responseData.metadata.status.errorCode == "Auth1005")
+//         //|| (structKeyExists(apiResponse.responseData.metadata.status, "statusCode") && apiResponse.responseData.metadata.status.statusCode == "Auth1005")
+//     )
+//     && !arguments.reAuth) {
+//     return rawRequest(argumentCollection=arguments, reAuth=true);
+                
+            //    return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+
+            // if ($api_response['response']['code'] == xxx)
+            //     return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+
+           
+
+
+// // The API returned a 403 Forbidden so throw an exception
+// } else if (apiResponse.responseStatusCode == 403) {
+//     throw(type="wolfnet.api.client.Forbidden",
+//         message=httpPrefix.status_text,
+//         extendedInfo=serializeJSON(apiResponse));
+
+// // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
+// } else if (apiResponse.responseStatusCode == 400
+//     && (
+//         (structKeyExists(apiResponse.responseData.metadata.status, "errorCode") && apiResponse.responseData.metadata.status.errorCode == "Auth1005")
+//         || (structKeyExists(apiResponse.responseData.metadata.status, "statusCode") && apiResponse.responseData.metadata.status.statusCode == "Auth1005")
+//     )
+//     && !arguments.reAuth) {
+//     return rawRequest(argumentCollection=arguments, reAuth=true);
+
+// // We received an unexpected response from the API so throw an exception.
+// } else if (apiResponse.responseStatusCode != 200) {
+//     throw(type="wolfnet.api.client.BadResponse",
+//         message=httpPrefix.status_text,
+//         extendedInfo=serializeJSON(apiResponse));
+
+// }
     
             // build an array with useful representation of the response 
             $response = array(

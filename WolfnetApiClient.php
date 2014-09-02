@@ -121,6 +121,8 @@ class Wolfnet_Api_Wp_Client
             $api_token = $this->getApiToken( $key, $reAuth);
             if (is_wp_error($api_token))  return $api_token;
             $headers['api_token'] = $api_token;
+            $headers['Accept-Encoding'] = 'gzip, deflate';
+            //$headers['v'] = "1";
         }
 
 
@@ -152,9 +154,15 @@ class Wolfnet_Api_Wp_Client
 
             $api_response = wp_remote_request($full_url, $args);
 
-            echo "<pre>api_response: \n";
-            print_r($api_response);
-            echo "</pre>";
+            // echo "<pre>full_url:\n";
+            // print_r($full_url);
+
+            // echo "\n\nargs\n";
+            // print_r($args);
+
+            // echo "\n\napi_response: \n";
+            // print_r($api_response);
+            // echo "</pre>";
     
             if (is_wp_error($api_response)) {
                 return $api_response;
@@ -179,6 +187,11 @@ class Wolfnet_Api_Wp_Client
             if ($api_response['response']['code'] == 403)
                 return new WP_Error( '403', __( "403 Forbidden" ), $api_response );
 
+            // if ($api_response['response']['code'] == xxx)
+            //     return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+            
+
+            // TODO: rewrite in php
             // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
             // if ($api_response['response']['code'] == 400)
 //                && ( 

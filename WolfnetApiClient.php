@@ -47,6 +47,10 @@ class Wolfnet_Api_Wp_Client
      */
     public $transientIndexKey = 'wnt_tran_';
 
+    public function __construct() 
+    {        
+        add_action('wnt_cron_daily_hook', array($this,'clearTransients'));
+    }
 
     /**
      * This method is the public interface for making requests of the API.
@@ -65,7 +69,22 @@ class Wolfnet_Api_Wp_Client
         $headers = array()
     )
     {
+        // temp
+        // $this->clearTransients();
         return $this->rawRequest($key, $resource, $method, $data, $headers);
+    }
+
+
+    public function startWpDailyCron()
+    {
+        if ( !wp_next_scheduled( 'wnt_cron_daily_hook' ) ) {
+            wp_schedule_event( time(), 'daily', 'wnt_cron_hook' );
+        }
+    }
+
+    public function stopWpDailyCron()
+    {
+        wp_clear_scheduled_hook( 'wnt_cron_daily_hook' );
     }
 
     
@@ -154,27 +173,10 @@ class Wolfnet_Api_Wp_Client
 
             $api_response = wp_remote_request($full_url, $args);
 
-            // echo "<pre>full_url:\n";
-            // print_r($full_url);
-
-            // echo "\n\nargs\n";
-            // print_r($args);
-
-            // echo "\n\napi_response: \n";
-            // print_r($api_response);
-            // echo "</pre>";
-    
-            if (is_wp_error($api_response)) {
+           if (is_wp_error($api_response)) {
                 return $api_response;
             }
 
-// COLD FUSION CODE
-//             // The API returned a 401 Unauthorized so throw an exception.
-// if (apiResponse.responseStatusCode == 401) {
-//     throw(type="wolfnet.api.client.Unauthorized",
-//         message=httpPrefix.status_text,
-//         extendedInfo=serializeJSON(apiResponse));
-            
             // The API returned a 401 Unauthorized
             if ($api_response['response']['code'] == 401)
                 return new WP_Error( '401', __( "401 Unauthorized" ), $api_response );
@@ -189,48 +191,24 @@ class Wolfnet_Api_Wp_Client
 
             // if ($api_response['response']['code'] == xxx)
             //     return new WP_Error( 'xxx', __( "xxx" ), $api_response );
-            
 
-            // TODO: rewrite in php
             // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
-            // if ($api_response['response']['code'] == 400)
-//                && ( 
-//                    (structKeyExists(apiResponse.responseData.metadata.status, "errorCode") && apiResponse.responseData.metadata.status.errorCode == "Auth1005")
-//         //|| (structKeyExists(apiResponse.responseData.metadata.status, "statusCode") && apiResponse.responseData.metadata.status.statusCode == "Auth1005")
-//     )
-//     && !arguments.reAuth) {
-//     return rawRequest(argumentCollection=arguments, reAuth=true);
-                
-            //    return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+            if ($api_response['response']['code'] == 400) {
+                $data = json_decode($api_response['body']);
+                if ( (array_key_exists("errorCode", $data['metadata']['status']) && $data['metadata']['status']['errorCode']  == "Auth1005")
+                    || ( array_key_exists("statusCode", $data['metadata']['status']) && $data['metadata']['status']['statusCode']  == "Auth1005") )
+                {
+                    if (!$reAuth) {
+                        return $this->rawRequest($key, $resource, $method, $data, $headers, false, true);
+                    }
+                }
+            }
 
-            // if ($api_response['response']['code'] == xxx)
-            //     return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+            // We received an unexpected response from the API so throw an exception.
+            if ($api_response['response']['code'] != 200) {
+                return new WP_Error( '200', __( "Received unexpected responce from the API" ), $api_response );
 
-           
-
-
-// // The API returned a 403 Forbidden so throw an exception
-// } else if (apiResponse.responseStatusCode == 403) {
-//     throw(type="wolfnet.api.client.Forbidden",
-//         message=httpPrefix.status_text,
-//         extendedInfo=serializeJSON(apiResponse));
-
-// // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
-// } else if (apiResponse.responseStatusCode == 400
-//     && (
-//         (structKeyExists(apiResponse.responseData.metadata.status, "errorCode") && apiResponse.responseData.metadata.status.errorCode == "Auth1005")
-//         || (structKeyExists(apiResponse.responseData.metadata.status, "statusCode") && apiResponse.responseData.metadata.status.statusCode == "Auth1005")
-//     )
-//     && !arguments.reAuth) {
-//     return rawRequest(argumentCollection=arguments, reAuth=true);
-
-// // We received an unexpected response from the API so throw an exception.
-// } else if (apiResponse.responseStatusCode != 200) {
-//     throw(type="wolfnet.api.client.BadResponse",
-//         message=httpPrefix.status_text,
-//         extendedInfo=serializeJSON(apiResponse));
-
-// }
+            }
     
             // build an array with useful representation of the response 
             $response = array(
@@ -374,6 +352,51 @@ class Wolfnet_Api_Wp_Client
         return $token;
 
     }
+
+
+    private function clearTransients()
+    {
+        /*
+         * Deletes all expired transients. The multi-table delete syntax is used
+         * to delete the transient record from table a, and the corresponding
+         * transient_timeout record from table b.
+         */
+        
+        // _transient_timeout_wnt_tran_ed8e603a29504e3faced50a044567dc2
+        // _transient_wnt_tran_ed8e603a29504e3faced50a044567dc2
+        global $wpdb;
+
+
+        // the prefix of the option_name we are going to remove
+        $prefix = '_transient_' . $this->transientIndexKey;
+        $prefix_timeout = '_transient_timeout_' . $this->transientIndexKey;
+        $offset = strlen ( $prefix ) + 1;
+
+        $time = time();
+        $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
+            WHERE a.option_name LIKE %s
+            AND a.option_name NOT LIKE %s
+            AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )
+            AND b.option_value < %d";
+
+        $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
+    
+        if ( is_main_site() && is_main_network() ) {
+            $prefix = '_site_transient_' . $this->transientIndexKey;
+            $prefix_timeout = '_transient_site_timeout_' . $this->transientIndexKey;
+            $offset = strlen ( $prefix ) + 1;
+            $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
+                WHERE a.option_name LIKE %s
+                AND a.option_name NOT LIKE %s
+                AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )
+                AND b.option_value < %d";
+            $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
+        }
+
+
+   }
+
+
 
 
 }

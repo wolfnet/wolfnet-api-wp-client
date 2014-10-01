@@ -353,7 +353,15 @@ class Wolfnet_Api_Wp_Client
 
     }
 
-
+    /**
+     * Deletes all expired Wolfnet transients. This is the same method that WordPress uses
+     * to delete all expired transients during an update. I have modified the query to only 
+     * affect transients created by this class.
+     * The multi-table delete syntax is used
+     * to delete the transient record from table a, and the corresponding
+     * transient_timeout record from table b.
+     * @return [type] [description]
+     */
     private function clearTransients()
     {
         /*
@@ -365,7 +373,6 @@ class Wolfnet_Api_Wp_Client
         // _transient_timeout_wnt_tran_ed8e603a29504e3faced50a044567dc2
         // _transient_wnt_tran_ed8e603a29504e3faced50a044567dc2
         global $wpdb;
-
 
         // the prefix of the option_name we are going to remove
         $prefix = '_transient_' . $this->transientIndexKey;
@@ -395,9 +402,6 @@ class Wolfnet_Api_Wp_Client
 
 
    }
-
-
-
 
 }
 

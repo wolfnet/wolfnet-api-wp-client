@@ -49,7 +49,7 @@ class Wolfnet_Api_Wp_Client
 
     public function __construct() 
     {        
-        add_action('wnt_cron_daily_hook', array($this,'clearTransients'));
+        add_action('wnt_cron_daily', array($this,'clearTransients'));
     }
 
     /**
@@ -77,14 +77,31 @@ class Wolfnet_Api_Wp_Client
 
     public function startWpDailyCron()
     {
+        //$this->clearTransients();
+        //
+        // Temp
+        // ttt
+        // add some transients that will expire right away for testing.
+        // 
+        // $this->transientIndexKey
+        set_transient($this->transientIndexKey . 'one' , 'is the loneliest number that you ever do', 1);
+        set_transient($this->transientIndexKey . 'two' , 'can be as bad as one, its the loneliest number since the number one', 1);
+        set_transient($this->transientIndexKey . 'no' , 'is the saddest experience youll ever know', 1);
+        set_transient($this->transientIndexKey . 'yes' , 'its the saddest experience youll ever know', 1);
+       
+
         if ( !wp_next_scheduled( 'wnt_cron_daily_hook' ) ) {
-            wp_schedule_event( time(), 'daily', 'wnt_cron_hook' );
+            //wp_schedule_event( time(), 'daily', 'wnt_cron_daily' );
+
+            // ttt
+            //  temp hourly for testing
+            wp_schedule_event( time(), 'hourly', 'wnt_cron_daily' );
         }
     }
 
     public function stopWpDailyCron()
     {
-        wp_clear_scheduled_hook( 'wnt_cron_daily_hook' );
+        wp_clear_scheduled_hook( 'wnt_cron_daily' );
     }
 
     
@@ -360,16 +377,18 @@ class Wolfnet_Api_Wp_Client
      * The multi-table delete syntax is used
      * to delete the transient record from table a, and the corresponding
      * transient_timeout record from table b.
+     * @param  string   'expired' or 'all' 
      * @return [type] [description]
      */
-    private function clearTransients()
+    public function clearTransients($remove = 'expired')
     {
         /*
          * Deletes all expired transients. The multi-table delete syntax is used
          * to delete the transient record from table a, and the corresponding
          * transient_timeout record from table b.
          */
-        
+ 
+        // example settings table records created from  set_transient();
         // _transient_timeout_wnt_tran_ed8e603a29504e3faced50a044567dc2
         // _transient_wnt_tran_ed8e603a29504e3faced50a044567dc2
         global $wpdb;
@@ -383,8 +402,11 @@ class Wolfnet_Api_Wp_Client
         $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
             WHERE a.option_name LIKE %s
             AND a.option_name NOT LIKE %s
-            AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )
-            AND b.option_value < %d";
+            AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )";
+        if($remove == 'expired') {
+            $sql .= "AND b.option_value < %d";
+        }
+            
 
         $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
     
@@ -395,11 +417,12 @@ class Wolfnet_Api_Wp_Client
             $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
                 WHERE a.option_name LIKE %s
                 AND a.option_name NOT LIKE %s
-                AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )
-                AND b.option_value < %d";
+                AND b.option_name = CONCAT( '$prefix_timeout', SUBSTRING( a.option_name, $offset ) )";
+            if($remove == 'expired') {
+                $sql .= "AND b.option_value < %d";
+            }
             $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
         }
-
 
    }
 

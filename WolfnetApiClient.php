@@ -371,7 +371,8 @@ class Wolfnet_Api_Wp_Client
     }
 
     /**
-     * Deletes all expired Wolfnet transients. This is the same method that WordPress uses
+     * Deletes Wolfnet API transients. either just expired or all transients.
+     * This is the same method that WordPress uses
      * to delete all expired transients during an update. I have modified the query to only 
      * affect transients created by this class.
      * The multi-table delete syntax is used
@@ -383,7 +384,7 @@ class Wolfnet_Api_Wp_Client
     public function clearTransients($remove = 'expired')
     {
         /*
-         * Deletes all expired transients. The multi-table delete syntax is used
+         * The multi-table delete syntax is used
          * to delete the transient record from table a, and the corresponding
          * transient_timeout record from table b.
          */

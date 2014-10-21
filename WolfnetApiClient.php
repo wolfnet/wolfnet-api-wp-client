@@ -163,13 +163,16 @@ class Wolfnet_Api_Wp_Client
 
 
         $args = array(
-                'method'   => $method,
-                'headers'  => $headers,
+            'method'   => $method,
+            'headers'  => $headers,
         );
 
         //set up headers, body, and url data as needed
         switch ($method) {
             case 'GET':
+                foreach($data as $key => &$value) {
+                    $value = urlencode($value);
+                }
                 $full_url = add_query_arg($data, $full_url);
                 break;
             case 'POST':
@@ -190,7 +193,7 @@ class Wolfnet_Api_Wp_Client
 
             $api_response = wp_remote_request($full_url, $args);
 
-           if (is_wp_error($api_response)) {
+            if (is_wp_error($api_response)) {
                 return $api_response;
             }
 
@@ -212,8 +215,15 @@ class Wolfnet_Api_Wp_Client
             // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
             if ($api_response['response']['code'] == 400) {
                 $data = json_decode($api_response['body']);
-                if ( (array_key_exists("errorCode", $data['metadata']['status']) && $data['metadata']['status']['errorCode']  == "Auth1005")
-                    || ( array_key_exists("statusCode", $data['metadata']['status']) && $data['metadata']['status']['statusCode']  == "Auth1005") )
+
+                if ( 
+                    (   array_key_exists('status', $data['metadata']) 
+                        && (array_key_exists('errorCode', $data['metadata']['status']) 
+                        && $data['metadata']['status']['errorCode']  == "Auth1005")
+                    ) || ( 
+                        array_key_exists("statusCode", $data['metadata']['status']) 
+                        && $data['metadata']['status']['statusCode']  == "Auth1005") 
+                    )
                 {
                     if (!$reAuth) {
                         return $this->rawRequest($key, $resource, $method, $data, $headers, false, true);
@@ -309,6 +319,7 @@ class Wolfnet_Api_Wp_Client
         // Ensure that only simple values are included in the data. ie. strings, numbers, and booleans.
         foreach  ($data as $key => $value) {
             if (!is_scalar($value)) {
+
                 if (is_wp_error($valid)) { // if we already have error add a message to it
                     $valid->add('badData', __("invalid data type $key : $value"));
                 } else {

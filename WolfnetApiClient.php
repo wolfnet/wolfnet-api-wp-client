@@ -69,33 +69,15 @@ class Wolfnet_Api_Wp_Client
         $headers = array()
     )
     {
-        // temp
-        // $this->clearTransients();
         return $this->rawRequest($key, $resource, $method, $data, $headers);
     }
 
 
     public function startWpDailyCron()
     {
-        //$this->clearTransients();
-        //
-        // Temp
-        // ttt
-        // add some transients that will expire right away for testing.
-        // 
-        // $this->transientIndexKey
-        set_transient($this->transientIndexKey . 'one' , 'is the loneliest number that you ever do', 1);
-        set_transient($this->transientIndexKey . 'two' , 'can be as bad as one, its the loneliest number since the number one', 1);
-        set_transient($this->transientIndexKey . 'no' , 'is the saddest experience youll ever know', 1);
-        set_transient($this->transientIndexKey . 'yes' , 'its the saddest experience youll ever know', 1);
-       
-
         if ( !wp_next_scheduled( 'wnt_cron_daily_hook' ) ) {
-            //wp_schedule_event( time(), 'daily', 'wnt_cron_daily' );
+            wp_schedule_event( time(), 'daily', 'wnt_cron_daily' );
 
-            // ttt
-            //  temp hourly for testing
-            wp_schedule_event( time(), 'hourly', 'wnt_cron_daily' );
         }
     }
 
@@ -153,12 +135,10 @@ class Wolfnet_Api_Wp_Client
 
         // Unless told otherwise, attempt to retrieve an API token.
         if (!$skipAuth) {
-            
             $api_token = $this->getApiToken( $key, $reAuth);
             if (is_wp_error($api_token))  return $api_token;
             $headers['api_token'] = $api_token;
             $headers['Accept-Encoding'] = 'gzip, deflate';
-            //$headers['v'] = "1";
         }
 
 
@@ -184,6 +164,8 @@ class Wolfnet_Api_Wp_Client
                 $args['body'] = json_encode($data);
                 break;
         }
+
+        // error_log($full_url);
 
         // check to see if we have this cached:
         $transient_key = $this->transientIndexKey . md5($full_url . json_encode($args));
@@ -211,29 +193,43 @@ class Wolfnet_Api_Wp_Client
 
             // if ($api_response['response']['code'] == xxx)
             //     return new WP_Error( 'xxx', __( "xxx" ), $api_response );
+              
 
             // The API returned a 400 Bad Response because the token it was given was not valid, so attempt to re-authenticated and perform the request again.
             if ($api_response['response']['code'] == 400) {
                 $data = json_decode($api_response['body']);
 
                 if ( 
-                    (   array_key_exists('status', $data['metadata']) 
-                        && (array_key_exists('errorCode', $data['metadata']['status']) 
-                        && $data['metadata']['status']['errorCode']  == "Auth1005")
+                    //(   array_key_exists('status', $data['metadata']) 
+                    (   property_exists($data->metadata, 'status') 
+                        //&& (array_key_exists('errorCode', $data['metadata']['status']) 
+                        && (property_exists($data->metadata->status, 'errorCode' ) 
+                        //&& $data['metadata']['status']['errorCode']  == "Auth1005")
+                        && $data->metadata->status->errorCode  == "Auth1005")
                     ) || ( 
-                        array_key_exists("statusCode", $data['metadata']['status']) 
-                        && $data['metadata']['status']['statusCode']  == "Auth1005") 
+                        // array_key_exists("statusCode", $data['metadata']['status']) 
+                        property_exists($data->metadata->status, "statusCode" ) 
+                        // && $data['metadata']['status']['statusCode']  == "Auth1005") 
+                        && $data->metadata->status->statusCode  == "Auth1005" )
                     )
                 {
                     if (!$reAuth) {
                         return $this->rawRequest($key, $resource, $method, $data, $headers, false, true);
-                    }
+                    } 
+                    
+                } 
+                elseif(array_key_exists('message', $api_response['response'])) 
+                {
+                    return new WP_Error( '400', __(  $api_response['response']['message'] ), $api_response );
+                } else 
+                {
+                    return new WP_Error( '400', __( "Received unexpected response from the API" ), $api_response );
                 }
             }
 
             // We received an unexpected response from the API so throw an exception.
             if ($api_response['response']['code'] != 200) {
-                return new WP_Error( '200', __( "Received unexpected responce from the API" ), $api_response );
+                return new WP_Error( '200', __( "Received unexpected response from the API" ), $api_response );
 
             }
     
@@ -399,10 +395,7 @@ class Wolfnet_Api_Wp_Client
          * to delete the transient record from table a, and the corresponding
          * transient_timeout record from table b.
          */
- 
-        // example settings table records created from  set_transient();
-        // _transient_timeout_wnt_tran_ed8e603a29504e3faced50a044567dc2
-        // _transient_wnt_tran_ed8e603a29504e3faced50a044567dc2
+
         global $wpdb;
 
         // the prefix of the option_name we are going to remove

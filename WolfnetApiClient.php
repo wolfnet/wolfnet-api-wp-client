@@ -26,6 +26,7 @@ class Wolfnet_Api_Wp_Client
      * @var string
      */
     private $host = 'api.dev.wolfnet.com';
+    //private $host = 'api.dev.wolfnet.com';
 
     /**
      * The version of the API to make requests of.

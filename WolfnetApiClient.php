@@ -15,21 +15,20 @@ class Wolfnet_Api_Wp_Client
     private $debug = false;
 
     /**
-     * Defins how long, in seconds, we should cache api responses before we query the server again
+     * Defines how long, in seconds, we should cache api responses before we query the server again
      * @var int
      */
     // private $requestTtl = (30 * 60); // 30 min
-    private $requestTtl = 1800; // 30 min
+    private $requestTtl = 900; // 15 min
 
     /**
      * The hostname for the API server.
      * @var string
      */
-    private $host = 'api.dev.wolfnet.com';
-    //private $host = 'api.dev.wolfnet.com';
+    private $host = 'api.wolfnet.com';
 
     /**
-     * The version of the API to make requests of.
+     * The version of the API to make requests.
      * @var string
      */
     private $version = "1";
@@ -117,7 +116,6 @@ class Wolfnet_Api_Wp_Client
     )
     {
         $method = strtoupper($method);
-
 
         // Make sure the resource is valid.
         $err = $this->isValidResource($resource);
@@ -320,7 +318,8 @@ class Wolfnet_Api_Wp_Client
                 if (is_wp_error($valid)) { // if we already have error add a message to it
                     $valid->add('badData', __("invalid data type $key : $value"));
                 } else {
-                    $valid = new WP_Error('badData', __("invalid data type $key : $value"), $data);
+                    $show = print_r($data, true);
+                    $valid = new WP_Error( 'badData', __("invalid data type $key : $value"), $show );
                 }
             }
         }

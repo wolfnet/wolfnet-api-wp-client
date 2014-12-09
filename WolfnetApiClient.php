@@ -414,7 +414,7 @@ class Wolfnet_Api_Wp_Client
             
         $wpdb->query( $wpdb->prepare( $sql, $prefix . '%', $prefix_timeout . '%', $time ) );
     
-        if ( is_main_site() && is_main_network() ) {
+        if ( is_main_site() && function_exists('is_main_network') && is_main_network() ) {
             $prefix = '_site_transient_' . $this->transientIndexKey;
             $prefix_timeout = '_transient_site_timeout_' . $this->transientIndexKey;
             $offset = strlen ( $prefix ) + 1;

@@ -402,8 +402,8 @@ class Wolfnet_Api_Wp_Client
         $prefix = '_transient_' . $this->transientIndexKey;
         $prefix_timeout = '_transient_timeout_' . $this->transientIndexKey;
         $offset = strlen ( $prefix ) + 1;
-
         $time = time();
+
         $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
             WHERE a.option_name LIKE %s
             AND a.option_name NOT LIKE %s
@@ -412,13 +412,13 @@ class Wolfnet_Api_Wp_Client
             $sql .= "AND b.option_value < %d";
         }
             
-
-        $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
+        $wpdb->query( $wpdb->prepare( $sql, $prefix . '%', $prefix_timeout . '%', $time ) );
     
         if ( is_main_site() && is_main_network() ) {
             $prefix = '_site_transient_' . $this->transientIndexKey;
             $prefix_timeout = '_transient_site_timeout_' . $this->transientIndexKey;
             $offset = strlen ( $prefix ) + 1;
+
             $sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
                 WHERE a.option_name LIKE %s
                 AND a.option_name NOT LIKE %s
@@ -426,7 +426,8 @@ class Wolfnet_Api_Wp_Client
             if($remove == 'expired') {
                 $sql .= "AND b.option_value < %d";
             }
-            $wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( $prefix ) . '%', $wpdb->esc_like( $prefix_timeout ) . '%', $time ) );
+            
+            $wpdb->query( $wpdb->prepare( $sql, $prefix . '%', $prefix_timeout . '%', $time ) );
         }
 
    }

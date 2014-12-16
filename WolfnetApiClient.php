@@ -319,7 +319,7 @@ class Wolfnet_Api_Wp_Client
                     $valid->add('badData', __("invalid data type $key : $value"));
                 } else {
                     $show = print_r($data, true);
-                    $valid = new WP_Error( 'badData', __("invalid data type $key : $value"), $show );
+                    $valid = new WP_Error( 'badData', __("Invalid API request argument"), $show );
                 }
             }
         }

@@ -316,7 +316,8 @@ class Wolfnet_Api_Wp_Client
             if (!is_scalar($value)) {
 
                 if (is_wp_error($valid)) { // if we already have error add a message to it
-                    $valid->add('badData', __("invalid data type $key : $value"));
+                    $show = print_r($data, true);
+                    $valid->add('badData', __("Invalid API request argument"), $show);
                 } else {
                     $show = print_r($data, true);
                     $valid = new WP_Error( 'badData', __("Invalid API request argument"), $show );
